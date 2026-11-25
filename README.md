@@ -39,11 +39,14 @@ make
 
 Both file arguments are required.
 
-
 ## Interpreter
 
-The interpreter executes `li`, `lw`, and `sw`.
-The `ror` instruction is decoded but is not executable at this stage.
+The interpreter executes all four variant 10 instructions:
+`li`, `lw`, `sw`, and `ror`.
+
+Data values are unsigned 32-bit integers.
+Rotation counts are reduced modulo 32.
+The indirect address used by `ror` must be within data memory.
 
 The VM has eight writable 32-bit unsigned registers and 2097152
 32-bit unsigned data memory cells. Registers and data memory start at zero.
@@ -59,7 +62,7 @@ instructions are rejected.
 ```
 
 | Argument | Description |
-|---|---|
+| --- | --- |
 | `--input FILE` | Binary program |
 | `--output FILE` | XML memory dump |
 | `--start N` | First data memory address, inclusive |
@@ -73,6 +76,18 @@ then copies them to addresses 200–202.
 
 VM tests cover array copying, boundary addresses, and invalid operands.
 Decoder tests cover the specification examples and invalid encodings.
+
+## Rotation example
+
+```powershell
+.\assembler.exe --input tests/rotate.asm --output rotate.bin
+.\interpreter.exe --input rotate.bin --output memory.xml --start 200 --end 202
+```
+
+Expected values at addresses 200–202: 2147483652, 9, 2147483652.
+
+VM rotation tests cover zero counts, counts modulo 32, result storage,
+overlapping source and destination registers, and invalid indirect addresses.
 
 ## Assembly syntax
 

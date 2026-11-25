@@ -69,6 +69,46 @@ int main(void) {
   invalid = (Instruction){.a = OP_LI, .b = VM_MEMORY_SIZE, .c = 0};
   assert(!vm_execute(&vm, &invalid));
 
+  /* Rotate a known 32-bit value by different counts. */
+  vm.memory[300] = UINT32_C(0x12345678);
+  vm.registers[1] = 301;
+
+  const uint32_t counts[] = {0, 4, 32, 36, 1, 31};
+
+  const uint32_t rotated[] = {UINT32_C(0x12345678), UINT32_C(0x81234567),
+                              UINT32_C(0x12345678), UINT32_C(0x81234567),
+                              UINT32_C(0x091A2B3C), UINT32_C(0x2468ACF0)};
+
+  const Instruction rotate = {.a = OP_ROR, .b = 1, .c = 300, .d = 2};
+
+  const Instruction store = {.a = OP_SW, .b = 302, .c = 2};
+
+  for (size_t i = 0; i < sizeof(counts) / sizeof(counts[0]); ++i) {
+    vm.memory[301] = counts[i];
+
+    assert(vm_execute(&vm, &rotate));
+    assert(vm.registers[2] == rotated[i]);
+
+    assert(vm_execute(&vm, &store));
+    assert(vm.memory[302] == rotated[i]);
+  }
+
+  /* The destination may also be the address register. */
+  vm.memory[301] = 4;
+  vm.registers[1] = 301;
+
+  Instruction overlap = {.a = OP_ROR, .b = 1, .c = 300, .d = 1};
+
+  assert(vm_execute(&vm, &overlap));
+  assert(vm.registers[1] == UINT32_C(0x81234567));
+
+  /* Reject an indirect address outside data memory. */
+  vm.registers[1] = VM_MEMORY_SIZE;
+  vm.registers[2] = 123;
+
+  assert(!vm_execute(&vm, &rotate));
+  assert(vm.registers[2] == 123);
+
   vm_free(&vm);
 
   assert(vm.memory == NULL);

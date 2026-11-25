@@ -15,6 +15,16 @@ void vm_free(Vm *vm) {
   *vm = (Vm){0};
 }
 
+static uint32_t rotate_right(uint32_t value, uint32_t count) {
+  count %= 32;
+
+  if (count == 0) {
+    return value;
+  }
+
+  return (value >> count) | (value << (32 - count));
+}
+
 int vm_execute(Vm *vm, const Instruction *instruction) {
   if (vm->memory == NULL) {
     return 0;
@@ -47,6 +57,26 @@ int vm_execute(Vm *vm, const Instruction *instruction) {
 
     vm->memory[instruction->b] = vm->registers[instruction->c];
     return 1;
+
+  case OP_ROR: {
+    if (instruction->b >= VM_REGISTER_COUNT ||
+        instruction->c >= VM_MEMORY_SIZE ||
+        instruction->d >= VM_REGISTER_COUNT) {
+      return 0;
+    }
+
+    uint32_t count_address = vm->registers[instruction->b];
+
+    if (count_address >= VM_MEMORY_SIZE) {
+      return 0;
+    }
+
+    uint32_t value = vm->memory[instruction->c];
+    uint32_t count = vm->memory[count_address];
+
+    vm->registers[instruction->d] = rotate_right(value, count);
+    return 1;
+  }
 
   default:
     return 0;
