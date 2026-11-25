@@ -1,3 +1,4 @@
+#include "encoder.h"
 #include "parser.h"
 
 #include <inttypes.h>
@@ -69,15 +70,65 @@ static int parse_arguments(int argc, char **argv, Config *config) {
   return 1;
 }
 
-static void print_instruction(const Instruction *instruction) {
-  printf("A=%u, B=%" PRIu32 ", C=%" PRIu32, (unsigned)instruction->a,
-         instruction->b, instruction->c);
+static int assemble(FILE *input, FILE *output, const Config *config) {
+  char line[1024];
+  size_t line_number = 0;
+  size_t instruction_count = 0;
 
-  if (instruction->a == OP_ROR) {
-    printf(", D=%" PRIu32, instruction->d);
+  while (fgets(line, sizeof(line), input) != NULL) {
+    ++line_number;
+
+    if (strchr(line, '\n') == NULL && !feof(input)) {
+      int next = fgetc(input);
+
+      if (next != '\n' && next != EOF) {
+        fprintf(stderr, "%s:%zu: line is too long\n", config->input,
+                line_number);
+        return 0;
+      }
+    }
+
+    Instruction instruction = {0};
+    ParseResult result = parse_instruction(line, &instruction);
+
+    if (result == PARSE_EMPTY) {
+      continue;
+    }
+
+    if (result == PARSE_ERROR) {
+      fprintf(stderr, "%s:%zu: invalid instruction\n", config->input,
+              line_number);
+      return 0;
+    }
+
+    uint8_t bytes[4];
+
+    if (!encode_instruction(&instruction, bytes)) {
+      fprintf(stderr, "%s:%zu: cannot encode instruction\n", config->input,
+              line_number);
+      return 0;
+    }
+
+    if (fwrite(bytes, 1, sizeof(bytes), output) != sizeof(bytes)) {
+      fprintf(stderr, "Cannot write machine code\n");
+      return 0;
+    }
+
+    if (config->test) {
+      printf("%02X %02X %02X %02X\n", (unsigned)bytes[0], (unsigned)bytes[1],
+             (unsigned)bytes[2], (unsigned)bytes[3]);
+    }
+
+    ++instruction_count;
   }
 
-  putchar('\n');
+  if (ferror(input)) {
+    fprintf(stderr, "Cannot read input file: %s\n", config->input);
+    return 0;
+  }
+
+  printf("Encoded instructions: %zu\n", instruction_count);
+  return 1;
 }
 
 int main(int argc, char **argv) {
@@ -94,52 +145,28 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  char line[1024];
-  size_t line_number = 0;
-  size_t instruction_count = 0;
-
-  while (fgets(line, sizeof(line), input) != NULL) {
-    ++line_number;
-
-    if (strchr(line, '\n') == NULL && !feof(input)) {
-      int next = fgetc(input);
-
-      if (next != '\n' && next != EOF) {
-        fprintf(stderr, "%s:%zu: line is too long\n", config.input,
-                line_number);
-        fclose(input);
-        return 1;
-      }
-    }
-
-    Instruction instruction = {0};
-    ParseResult result = parse_instruction(line, &instruction);
-
-    if (result == PARSE_EMPTY) {
-      continue;
-    }
-
-    if (result == PARSE_ERROR) {
-      fprintf(stderr, "%s:%zu: invalid instruction\n", config.input,
-              line_number);
-      fclose(input);
-      return 1;
-    }
-
-    ++instruction_count;
-
-    if (config.test) {
-      print_instruction(&instruction);
-    }
-  }
-
-  if (ferror(input)) {
-    fprintf(stderr, "Cannot read input file: %s\n", config.input);
+  FILE *output = fopen(config.output, "wb");
+  if (output == NULL) {
+    perror(config.output);
     fclose(input);
     return 1;
   }
 
+  int success = assemble(input, output, &config);
+
   fclose(input);
-  printf("Parsed instructions: %zu\n", instruction_count);
+
+  if (fclose(output) != 0) {
+    fprintf(stderr, "Cannot finish writing: %s\n", config.output);
+    success = 0;
+  }
+
+  if (!success) {
+    if (remove(config.output) != 0) {
+      perror(config.output);
+    }
+    return 1;
+  }
+
   return 0;
 }
