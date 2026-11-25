@@ -10,6 +10,9 @@ C11 assembler and interpreter project for variant 10.
 - Encoding of all four variant 10 instructions.
 - Binary output in little-endian byte order.
 - Machine code output in test mode.
+- Execution of all four instructions.
+- XML export of an inclusive data memory range.
+- Elementwise rotation of two eight-element vectors.
 
 Each instruction occupies four bytes.
 Execution is not implemented at this stage.
@@ -131,4 +134,48 @@ D2 3A 00 00
 97 18 00 04
 F5 1C 01 70
 Encoded instructions: 4
+```
+
+## Vector examples
+
+Each example initializes two eight-element vectors at addresses 100–107
+and 200–207, then computes:
+
+```text
+M[100 + i] = ROR(M[100 + i], M[200 + i]), i = 0..7
+```
+
+The result overwrites the first vector. The second vector is preserved.
+The processing sequence is unrolled because the instruction set has
+no branch instructions.
+
+| Source | Test data |
+|---|---|
+| `tests/vector_basic.asm` | Powers of two rotated by one position |
+| `tests/vector_mixed.asm` | Different values and rotation counts |
+| `tests/vector_counts.asm` | Counts 0, 1, 2, 3, 4, 31, 32, and 33 |
+
+Each example contains 56 instructions and produces 224 bytes of machine code.
+
+## Integration tests
+
+On Windows, with Windows PowerShell available:
+
+```powershell
+make test-integration
+```
+
+The tests assemble and execute all three vector examples, verify binary
+sizes, validate XML dump addresses, compare results with expected values,
+and check that the second vector is preserved.
+
+Generated binaries and XML dumps are stored in `build/`.
+
+## Manual vector execution
+
+```powershell
+New-Item -ItemType Directory -Force .\build | Out-Null
+.\assembler.exe --input tests/vector_basic.asm --output build/vector_basic.bin
+.\interpreter.exe --input build/vector_basic.bin --output build/result.xml --start 100 --end 107
+Get-Content .\build\result.xml
 ```

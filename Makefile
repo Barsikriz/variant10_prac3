@@ -32,3 +32,9 @@ test_decoder.exe: tests/test_decoder.c src/decoder.c $(HEADERS)
 
 test_vm.exe: tests/test_vm.c src/vm.c $(HEADERS)
 	$(CC) $(CFLAGS) -Isrc tests/test_vm.c src/vm.c -o $@
+
+
+.PHONY: test-integration
+
+test-integration: all
+	powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_vectors.ps1
