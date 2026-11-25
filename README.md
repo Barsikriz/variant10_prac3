@@ -39,6 +39,41 @@ make
 
 Both file arguments are required.
 
+
+## Interpreter
+
+The interpreter executes `li`, `lw`, and `sw`.
+The `ror` instruction is decoded but is not executable at this stage.
+
+The VM has eight writable 32-bit unsigned registers and 2097152
+32-bit unsigned data memory cells. Registers and data memory start at zero.
+Instruction input is separate from data memory.
+
+Instructions execute sequentially. Execution stops at the end of the
+binary file. Invalid opcodes, nonzero unused bits, and incomplete
+instructions are rejected.
+
+```powershell
+.\assembler.exe --input tests/copy.asm --output copy.bin
+.\interpreter.exe --input copy.bin --output memory.xml --start 200 --end 202
+```
+
+| Argument | Description |
+|---|---|
+| `--input FILE` | Binary program |
+| `--output FILE` | XML memory dump |
+| `--start N` | First data memory address, inclusive |
+| `--end N` | Last data memory address, inclusive |
+
+All interpreter arguments are required.
+Addresses are decimal integers from 0 to 2097151.
+
+The copy example initializes addresses 100–102 with 10, 20, and 30,
+then copies them to addresses 200–202.
+
+VM tests cover array copying, boundary addresses, and invalid operands.
+Decoder tests cover the specification examples and invalid encodings.
+
 ## Assembly syntax
 
 One instruction per line. Blank lines are ignored.
